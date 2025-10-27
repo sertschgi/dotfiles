@@ -1,0 +1,15 @@
+*
+
+!.gitignore
+!.gitmodules
+
+!nushell
+!nushell/**
+nushell/history.txt
+nushell/plugin.msgpackz
+
+!hypr
+!hypr/**
+!kitty
+!kitty/**
+
