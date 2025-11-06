@@ -36,6 +36,7 @@ alias pmr = sudo xbps-remove
 alias pmq = xbps-query -Rs
 alias pmf = pmq
 alias pmu = pmi -Su
+alias pmc = sudo xbps-remove -oO
 alias n = nvim
 alias s = sudo
 alias r = ranger
