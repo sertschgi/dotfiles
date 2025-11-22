@@ -1,6 +1,12 @@
 [submodule "hypr"]
 	path = hypr
 	url = https://github.com/sertschgi/hyprland-rice.git
+[submodule "eww"]
+	path = eww 
+	url = https://github.com/sertschgi/eww-config.git
+[submodule "rofi"]
+	path = rofi 
+	url = https://github.com/sertschgi/rofi-config.git
 [submodule "kitty"]
 	path = kitty
 	url = https://github.com/sertschgi/kitty-conf.git
