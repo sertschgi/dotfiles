@@ -8,8 +8,8 @@ $env.PROMPT_MULTILINE_INDICATOR = ""
 $env.PROMPT_INDICATOR = ""
 
 # bash-env
-path add ("./bash-env-json" | path expand)
-use "bash-env/bash-env.nu"
+path add ("~/.config/nushell/bash-env-json" | path expand)
+use "./bash-env/bash-env.nu"
 
 # pnpm
 $env.PNPM_HOME = ([$env.HOME, ".local/share/pnpm"] | path join)
