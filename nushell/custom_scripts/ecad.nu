@@ -53,6 +53,7 @@ export def deserialize_lib_table [] {
 }
 
 export def serialize_lib_table [] {
+  print $in
   let libs = $in.libs | format pattern $TABLE_SERDE.ser.items.libs
   let version = $in | select version | format pattern $TABLE_SERDE.ser.items.version
   let items = $version | append $libs | to text
@@ -66,18 +67,30 @@ export def lib_table_from_name [] {
 
 def save_lib_table [] {
   let path = $in.path
-  serialize_lib_table | save -f path
+  $in | serialize_lib_table | save -f path
 }
 
+def add_if_contains_elt_name [elt] {
+  $in | each { |e| if ($in.name == $e.name) { return } }
+  append $elt
+}
+
+def tables [] {
+  $LIBRARIES | items { |n, l| $l.table_name | lib_table_from_name }
+}
+
+def libs [] {
+  reduce {|table, libs| $libs | add_if_contains_elt_name $table.libs } 
+}
 
 def installed [] {
-  $LIBRARIES | items { |n, l| $l.table_name | lib_table_from_name } | reduce {|elt, acc| $acc | merge $elt } 
+  tables | libs
 }
 
 def not_installed [] {
   let files = ls ~/Downloads | get name | name_from_install_file_path
   let installed = installed
-  $files | where { |e| $installed.libs | find e | is-empty }
+  $files | where { |e| $installed | find e | is-empty }
 }
 
 
@@ -93,13 +106,12 @@ def extract_file [] {
 
 def dest [] {
   let name = $in;
-  let mappings = [
+  [
     [dir ending];
     ["3dmodels" "stp"]
     ["footprints" "kicad_mod"]
     ["symbols" "kicad_sym"]
-  ]
-  $mappings | each { |m| {dest: ([(kicad_data_dir) $m.dir $"($name).($m.ending)"] | path join)} }
+  ] | each { |m| {dest: ([(kicad_data_dir) $m.dir $"($name).($m.ending)"] | path join)} }
 }
 
 def insert_in_table [name path table_name] {
@@ -109,25 +121,18 @@ def insert_in_table [name path table_name] {
   $table | insert $index $"  \(lib \(name \"($name)\")\(type \"KiCad\"\)\(uri \"($path)\"\)\(options \"\")\(descr \"\"\))" | save -f $table_path
 }
 
-export def main [] {
-  # let commands = [
-  #   ["command", "description"]; 
-  #   ["list", "list all available files"], 
-  #   ["install <index: int>", "installs the file into your $env.KICAD_DATA/.."]
-  # ] 
-  #
-  # print "available commands: " $commands "Note: to install put your files in the ~./Downloads folder"
-}
 
 def list_installed [] {
     print "installed: "
-    print (installed | get libs | reject type options uri)
+    print (installed | reject type options uri)
 }
 
 def list_not_installed [] {
     print "not installed: "
-    print (not_installed | get libs)
+    print (not_installed)
 }
+
+export def main [] { }
 
 export def list [ --installed (-i) --not_installed (-n) ] {
   if not $installed and not $not_installed {
@@ -160,13 +165,12 @@ export def install [index: int] {
 
   let dest = $file.name | dest
   
-  let src = [ 
+  [ 
     [src];
     [([$inner_tmp_path "3D" "*.stp"] | path join)] 
     [([$ki_cad_src "*.kicad_mod"] | path join)] 
     [([$ki_cad_src "*.kicad_sym"] | path join)] 
-  ]
-  $src | merge $dest | each { |m| {mv (glob $m.src).0 $m.dest} }
+  ] | merge $dest | each { |m| {mv (glob $m.src).0 $m.dest} }
 
   table_names | merge $dest | each { |t| insert_in_table $file.name $t.dest $t.name }
 
@@ -176,8 +180,13 @@ export def install [index: int] {
 }
 
 export def remove [index: int] {
-  let installed = installed
-  print $installed
-  let name = $installed.libs | get $index
-  $name
+  let tables = tables
+  let libs = $tables | libs 
+  let name = $libs | get $index | get name
+  let paths = $name | dest | get dest
+
+  $paths | each { |p| print $"removing ($p)"; rm $p  }
+  $tables | each { |t| $t | update libs ($t.libs | where $it.name != $name) | save_lib_table } 
+
+  $"removed ($name) successfully."
 }
