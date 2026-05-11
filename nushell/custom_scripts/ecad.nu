@@ -109,12 +109,16 @@ def not_installed [] {
 
 def dest [] {
   let name = $in;
-  [
+  let map = [
     [dir ending];
     ["3dmodels" "stp"]
-    ["footprints" "kicad_mod"]
+    [(["footprints", $name] | path join) "kicad_mod"]
     ["symbols" "kicad_sym"]
-  ] | each { |m| {dest: ([(kicad_data_dir) $m.dir $"($name).($m.ending)"] | path join)} }
+  ]
+  let dest_dirs = $map | each { |m| {dir: ([(kicad_data_dir) $m.dir] | path join)} }
+  $dest_dirs | each { |d| mkdir $d.dir }
+  let dest = $map | merge $dest_dirs | each { |m| {dest: ([$m.dir $"($name).($m.ending)"] | path join)} }
+  $dest
 }
 
 def insert_in_table [name path table_name] {
@@ -161,21 +165,32 @@ export def install [index: int] {
   let file = $tables | libs | not_installed_in | get $index
 
   let tmp_path = ["/tmp" "ecad"] | path join  
-  let _ = unzip -o $file.path -d $tmp_path | complete 
+  let _ = unzip -o $file.path -d $tmp_path 
 
   let inner_tmp_path = [$tmp_path $file.name] | path join
   let ki_cad_src = [$inner_tmp_path "KiCad"] | path join
 
-  let dest = $file.name | dest
-  
-  [ 
-    ([$inner_tmp_path "3D" "*.stp"] | path join) 
-    ([$ki_cad_src "*.kicad_mod"] | path join) 
-    ([$ki_cad_src "*.kicad_sym"] | path join) 
-  ] | each { |p| glob $p | get 0 } | wrap src | merge $dest | each { |m| print $"moving ($m.src) to ($m.dest)"; mv $m.src $m.dest }
+  let dest = $file.name | dest | merge $tables 
 
-  $tables | merge $dest | each { |td|
-    $td | update libs ($in.libs | append { name: $file.name uri: $td.dest type: "KiCad" descr: null options: null}) | reject dest |  save_lib_table 
+  let src = [
+    [src];
+    [[$inner_tmp_path "3D" "*.stp"]]
+    [[$ki_cad_src "*.kicad_mod"]]
+    [[$ki_cad_src "*.kicad_sym"]]
+  ] | merge $tables | each { |p| 
+      let s = $p.src | path join | glob $in; 
+      if ($s | is-empty) { return }
+      mut p = $p;
+      $p.src = $s | get 0 
+      $p
+  }
+
+  let entries = $src | join $dest name
+
+  $entries | each { |m| print $"moving ($m.src) to ($m.dest)"; mv $m.src $m.dest }
+
+  $entries | each { |td|
+    $td | update libs ($in.libs | append { name: $file.name uri: $td.dest type: "KiCad" descr: null options: null}) | reject dest src |  save_lib_table 
   }
 
   rm -r $tmp_path
@@ -189,7 +204,7 @@ export def remove [index: int] {
   let name = $libs | get $index | get name
   let paths = $name | dest | get dest
 
-  $paths | each { |p| print $"removing ($p)"; rm $p  }
+  $paths | each { |p| if ($p | path exists) { print $"removing ($p)"; rm $p } }
   $tables | each { |t| $t | update libs ($t.libs | where $it.name != $name) | save_lib_table } 
 
   $"removed ($name) successfully."

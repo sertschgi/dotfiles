@@ -6,7 +6,6 @@ $env.config = {
     cursor_shape: {
       vi_insert: blink_line
       vi_normal: block
-      emacs: line
     }
 }
 
